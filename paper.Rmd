@@ -1,0 +1,413 @@
+---
+title: "Beer Advocate Data Analysis"
+author: "Zane Billings"
+date: "30 April, 2020"
+output: html_document
+bibliography:
+  - BA.bib
+  - BA_R.bib
+nocite: "@*"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      fig.asp = 0.618, fig.fullwidth = TRUE)
+
+library(jsonlite)
+library(here)
+library(tidyverse)
+library(lubridate)
+library(pander)
+library(cowplot)
+library(RColorBrewer)
+library(ggbeeswarm)
+
+papaja::r_refs("BA_R.bib")
+
+old <- theme_set(theme_classic(base_size = 16))
+panderOptions('keep.trailing.zeros', TRUE)
+panderOptions('table.alignment.default', 'right')
+panderOptions('table.alignment.rownames', 'left')
+panderOptions('missing', "")
+panderOptions('table.split.table', Inf)
+```
+
+```{r import data}
+reviews <- readRDS(here::here("cleaned/reviews.rds"))
+beers <- readRDS(here::here("cleaned/beers.rds"))
+
+breweries_list <- c("Sierra Nevada Brewing Co.", 
+                   "Highland Brewing",
+                   "Green Man Brewery",
+                   "French Broad Brewing Co.")
+```
+
+# Introduction
+
+[BeerAdvocate](https://www.beeradvocate.com/) is an online community marketed towards both amateur and professional beer enthusiasts and brewers. The site has several social networking features, but prominently includes a forum for discussing various topics related to beer production and consumption, a beer trading system, a directory of "beer-centric places", and a comprehensive beer reviewing system which collects reviews of almost every available commercial beer, archives these reviews, and provides some basic information about the rankings.
+
+Information is grouped by beer styles (of which the site features a comprehensive listing; arguable more comprehensive than the 2015 BJCP style guidelines) as well as by brewery. BeerAdvocate allows for both "ratings" and "reviews" of beer. According to BeerAdvocate, a review is a rating with at least 150 characters in the text description. The main statistics provided by BeerAdvocate are "rAvg", the mean overall rating for a specific beer, "pDev", the percentage deviation of ratings for a beer, and the BA Score, which is a Bayesian trimmed mean. 
+
+Basically, the BA Score is a metric that adjusts the rAvg of a beer based on the number of reviews the beer has. BeerAdvocate, as far as I can tell, at this time has not released the actual method used to calculate the BA Score for a beer. However, the pDev metric is not the same as the "percentage deviation" in common use--when I attempted to compute my own pDev values, they were either close to zero or astronomically large, based on my interpretation of the wording for how the metric is described by BeerAdvocate. So, while I will do my best to use accurate metrics for ranking beers, my metrics will not be identical to BeerAdvocate's.
+
+While BeerAdvocate appears to dislike anyone using their data, it is publically available. As far as I can surmise, there are no restrictions on scraping or using their data, but they have not released an API or dataset of their own. That being said, this report is intended purely for educational purposes. If BeerAdvocate asks me to destroy this report, I will comply out of politeness but hopefully I will have already graduated by then.
+
+# Methods
+
+## Data Collection
+
+At this time, BeerAdvocate does not have an API or a way for data to be exported other than by web scraping. I do not know how to scrape or crawl web data, so I relied on the kindness of strangers to find data (which is often an excellent way to do so). I attempted to use [this web crawler](https://github.com/sbuss/beeradvocate-scraper) written in `Scrapy`, but this version of `Scrapy` is no longer supported. However, once source of data I used was the provided JSON file in the GitHub repo which had already been obtained using the application previously.
+
+However, the [primary source of data I used](https://github.com/sbuss/beeradvocate-scraper) was a CSV provided on data.world for public use by the Stanford SNAP lab [@SNAP]. The provided dataset contained 1,586,614 reviews, dating over ten years up to 2011, and included the brewery name, beer name, beer style, review time, reviewer profile name (which was discarded, as it was unnecessary for my purposes), beer ABV, ratings for aroma, appearance, mouthfeel,  taste, and overall rating, as well as internal system ID keys for beers and breweries, which were kept just in case.
+
+## Data Wrangling
+
+In order to analyze the data, I first began by cleaning up the raw data from Stanford. I discarded the list of profile names, as these are not relevant to my analysis, and discarded any rows with missing values in any field. This left me with `r nrow(reviews)` reviews to work with, so while a lot had missing values, it was not really noticeable since the dataset is so large.
+
+I also created a derivative dataset based on the reviews dataset, with aggregated reviews for each beer. For each beer, I kept the beer name, brewery, and ABV, and calculated the mean for all of the ratings in each category, the number of reviews for each beer, and the standard error for the overall rating. Instead of the pDev, since I have no idea how BeerAdvocate calculates it, I used the standard error as a metric for how widely dispersed the beer's reviews are. Additionally, I attempted to approximate the BA score of the beer by using a Bayesian mean, similar to what BeerAdvocate and IMDB use to order rankings. The formula used was
+$$\mathrm{score} = \mathrm{rAvg}\left(\frac{\mathrm{votes}}{\mathrm{votes} + 10}\right) + \overline{\mathrm{rAvg}}\left( \frac{10}{\mathrm{votes} + 10}\right);$$
+
+$$\mathrm{s.s.} = \frac{\mathrm{score} - \overline{\mathrm{score}}}{s_{\mathrm{score}}}.$$
+
+The standardized score (s.s.) makes comparing the scores easier--a positive standardized score indicates that the beer is above average, a negative standardized score indicates that the beer is below average, and a standarized score close to zero indicates that the beer is about average.
+
+This formula essentially assumes that a beer needs about 10 reviews in order for the rating to be believable. If the beer has less than 10 reviews, its score will be biased towards the overall average score, damning it to mediocrity forever unless it can get more reviews. However, if a beer has more than 10 reviews, it will be biased towards a score reflective of the actual average rating, so if a beer has a lot of bad reviews, a lot of mediocre reviews, or a lot of good reviews, its score will reflect that.
+
+## Data Analysis and Visualization
+
+All analysis was performed using R [@R-base].
+```{r}
+sessionInfo()
+```
+
+For any significance tests, an *a priori* experiment-wise error rate of \(\alpha = 0.05\) will be used. However, all tests are exploratory and not indicative of any hypothesized trends.
+
+# Results
+
+## Top 10 Beers
+
+One of the most obvious questions to ask when looking at a dataset of beer reviews is to consider which beers, in general, are best. I examined the top 10 beers by standardized score in the dataset.
+
+*Table 1.* The top 10 beers in the dataset using the Bayesian review score as the metric.
+```{r top10beerstable}
+beers %>%
+  ungroup(beer_style) %>%
+  mutate(score = round(score, 2),
+         ss = round(ss, 2)) %>%
+  top_n(10, ss) %>%
+  select("Score" = score,
+         "S.S." = ss,
+         "Beer" = beer_name,
+         "Style" = beer_style,
+         "Brewery" = brewery_name) %>%
+  arrange(desc(`S.S.`)) %>%
+  pander::pander()
+```
+
+So, are there any secrets to being popular? Notably, four out of the top ten beers in this dataset are American DIPAs, suggesting that, at least among people who leave reviews on BeerAdvocate, DIPAs are likely the most popular style.
+
+The only brewery to have two beers in the top 10 is Russian River, and I did not find it surprising at all that both Plinys were included, based on how everyone always talks about them. Interestingly, they have the exact same standardized score as well (at least rounded to two decimal places). 
+
+Now, I also looked at the components which composed the ratings.
+
+```{r top10beersplot}
+beers %>%
+  ungroup(beer_style) %>%
+  top_n(10, score) %>%
+  arrange(desc(ss)) %>%
+  select("overall" = rAvg,
+         "aroma" = Avg_aroma,
+         "appearance" = Avg_appearance,
+         "palate" = Avg_palate,
+         "taste" = Avg_taste,
+         "name" = short_name,
+         "style" = beer_style) %>%
+  gather(key = "Area", value = "Score", -c(name, style)) %>%
+  mutate(Area = fct_rev(fct_relevel(Area, "aroma", "appearance", "palate", "taste", "overall"))) %>%
+  ggplot(aes(x = Score, y = Area, label = name)) +
+  geom_point() +
+  facet_wrap(~name, nrow = 2) +
+  scale_x_continuous(breaks = c(4, 4.5, 5), limits = c(4,5)) +
+  theme(strip.text = element_text(size = 8),
+        axis.text.x = element_text(size = 8),
+        legend.position = "none")
+```
+
+**Figure 1.** None of the top 10 beers had a rating in any category less than four. Typically, appearance was the lowest rating, while aroma and flavor tended to be higher.
+
+```{r top10abv}
+beers %>%
+  ungroup(beer_style) %>%
+  top_n(10, score) %>%
+  arrange(desc(ss)) %>%
+  select("S.S." = ss, ABV, "name" = short_name) %>%
+  ggplot(aes(x = ABV, y = `S.S.`, label = name)) +
+  geom_label(nudge_y = 0.005) +
+  geom_point() +
+  coord_cartesian(xlim = c(0, 15), ylim = c(3.38, 3.62), expand = FALSE)
+```
+
+**Figure 2.** Standardized score vs ABV for the top 10 beers by S.S. It looks like most (8/10) of the top 10 beers are higher ABV, though these are already the top 10 beers so modeling this trend doesn't make a lot of sense. 
+
+Well, at least from these 10 beers, it looks like the secret to being a good beer is just to be better at every category (duh). We're limited to the data we can extract here, but DIPAs tended to be popular--no other style was represented more than once. Most of the top 10 beers are higher ABV, but there is no indication of whether this trend is true in general.
+
+## ABV and SS
+
+Now I am interested in seeing if, in general, high ABV beers get better reviews on BeerAdvocate.
+
+```{r ABV dist}
+ggplot(beers, aes(x = ABV)) +
+  geom_histogram(binwidth = 1, col = "black", fill = "white") +
+  geom_rug()
+```
+
+**Figure 3.** Distribution of ABV values among all beers included in the dataset. While most beers fall between 5--10% ABV, some are much higher.
+
+In North Carolina, there is a 15% legal limit on ABV for beer, so I decided to use this value as a cutoff to get rid of outliers. Any beer with greater than 15% ABV was not used for this analysis. I also excluded beers with less than 1% ABV (the lowest value in the dataset was `r min(beers$ABV)`).
+
+```{r ABV lt 15 dist}
+beers %>%
+  filter(ABV <= 15, ABV >= 1) %>%
+  ggplot(aes(x = ABV)) +
+  geom_histogram(binwidth = 1, col = "black", fill = "white") +
+  geom_rug()
+```
+
+**Figure 4.** The distribution of ABV values for beers with ABV between 1--15% appears to be skewed right. The majority of beers tend to be around 5% ABV, but there are more higher gravity beers than lower gravity beers in the BeerAdvocate database.
+
+Now that we are restricting our ABV values to a reasonable range, we can try to see if there is any association between the ABV of a beer and its standardized score from BeerAdvocate reviews.
+
+```{r ABV vs SS}
+beers %>%
+  filter(ABV <= 15, ABV >= 1) %>%
+  ggplot(aes(x = ABV, y = ss)) +
+  geom_point() +
+  coord_cartesian(xlim = c(0, 15.05), expand = FALSE) +
+  ylab("Standardized score")
+```
+
+**Figure 5.** Wow, those are some low scores. Maybe we need to get rid of outliers in the SS also.
+
+So when I made this plot I definitely was not expecting to see a beer that had a standarized score EIGHT standard deviations below the mean. Either there's something wrong with my scoring metric, or BeerAdvocate has a tendency to rate bad beers more severely than good beers. Now I have to examine this trend before we can get back to looking at the ABV.
+
+```{r score dist}
+p1 <- beers %>%
+  select(beer_name, rAvg, score, ss) %>%
+  gather(key = "Metric", value = "Value", -beer_name) %>%
+  mutate(Metric = factor(Metric)) %>%
+  ggplot(aes(x = Value, fill = Metric)) +
+  geom_density(alpha = 0.5) +
+  coord_cartesian(expand = FALSE) + 
+  theme(legend.position = "none") +
+  ggtitle("With outliers") +
+  scale_fill_brewer(palette = "Dark2")
+
+p2 <- beers %>%
+  filter(ss >= -max(ss)) %>%
+  select(beer_name, rAvg, score, ss) %>%
+  gather(key = "Metric", value = "Value", -beer_name) %>%
+  mutate(Metric = factor(Metric)) %>%
+  ggplot(aes(x = Value, fill = Metric)) +
+  geom_density(alpha = 0.5) +
+  coord_cartesian(expand = FALSE) + 
+  theme(legend.position = "right") +
+  ggtitle("Lower outliers removed") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  scale_fill_brewer(palette = "Dark2")
+
+cowplot::plot_grid(p1, p2, nrow = 1)
+```
+
+**Figure 6.** All three metrics are significantly left skewed. The distributions of rAvg and score appear to be skew normal for the most part, and the distribution of ss is standard normal as expected. Based on this information, it will likely not be a problem to remove lower outliers from the standardized score data. The plot without outliers shows the distributions where I forced the standardized score to be symmetrical--all standardized scores lower than `r -max(beers$ss)` (the opposite of the maximum score) were removed.
+
+Now given these constraints maybe we can finally try to get this model.
+
+```{r ABV vs SS 2}
+beers %>%
+  filter(ABV <= 15, ABV >= 1, ss >= -max(ss)) %>%
+  ggplot(aes(x = ABV, y = ss)) +
+  geom_point(alpha = 0.7, fill = "#bebebe", col = "#989898", shape = 21) +
+  geom_smooth(method = "lm", lty = 2, col = "black") +
+  coord_cartesian(xlim = c(0, 15.05), ylim = c(-3.65, 3.65), 
+                  expand = FALSE) +
+  ylab("Standardized score")
+
+abv_mod <- lm(ss~ABV, data = beers)
+```
+
+**Figure 7.**  There appears to be a slight positive trend for the relationship between ABV and SS. 
+
+With this many data points, the linear model will almost definitely be significant, so the size of the slope matters more than the significance.
+
+**Table 2.** Linear model results for S.S. predicted by ABV.
+```{r ABV model table}
+abv_mod %>% pander::pander(round = c(3, 3, 3, 4))
+```
+
+So, we got an intercept of \(\beta_0 \approx -0.7\) and a slope of \(\beta_1 \approx 0.11\). Deciding whether or not this slope means anything is sort of arbitrary, but I am not going to attempt to analyze effect size or anything complicated like that. Basically, what this result implies is that for every 1% increase in a beer's ABV, the standardized score will increase by about 0.11. So, this isn't a huge trend and we can definitely see from the graph that there is a lot of variation, but maybe this explains something. At the least, it suggests that higher gravity beers are at least slightly more popular on BeerAdvocate.
+
+## Trends by style
+
+There are `r length(unique(beers$beer_style))` recorded in this data set. That is obviously too many styles for me to try and put on one graph. So, in order to faciliate visualizations, I added a second category called "Category" where I grouped the different styles by the BJCP style category I thought they belonged in. If the style was specifically listed on the BJCP 2015 guidelines, I put it in the correct category, but I had to do a little bit of guesswork so hopefully I didn't ruin everything.
+
+```{r categories, fig.height=10}
+beers %>%
+  mutate(category = fct_reorder(category, ss)) %>%
+  ggplot(aes(x = category, y = ss)) +
+  geom_boxplot() + 
+  stat_summary(fun.y = mean, shape = 5, geom = "point") +
+  geom_hline(yintercept = 0, lty = 2, col = "#898989") +
+  scale_y_continuous(breaks = seq(from = -9, to = 4, by = 1)) +
+  coord_flip() +
+  labs(x = "", y = "Standardized score")
+```
+**Figure 8.** Most styles tend to have average mean and median reviews (no style appears to be strongly skewed, although most are slightly left skewed). Crazy Bob's Cave Creek Chile Beer still has a score of -8.5, but I guess that's what you have to expect when you put a pepper in each bottle; not everyone will like that.
+
+In my opinion, the main conclusions to draw from this chart are as follows.
+
+1. Standard American beers (American lagers, wheat beers, and cream ales) get a pretty bad rap from BeerAdvocate; this trend appears to extend to all three of the "pale lager" styles included here. My guess is that these scores are deflated by a bunch of people who review based on their own biases instead of reviewing by style ("lawnmower beer" is often derided by the craft beer community).
+2. Styles that have a reputation for being "hipster"-y or "craft"-y tend towards higher scores on BeerAdvocate---that is, Belgians, dark beers, and IPAs tend to have above average median standard scores. These styles are, in my experience, those that craft breweries tend to make the most often, and they have a reputation of being "fancy beers".
+3. Most beer styles have a fair share of good beers and bad beers--regardless of what style you are interested in, BeerAdvocate has at least a couple good recommendations.
+
+## The Unjustified Derision of Lawnmower Beer
+
+After seeing that Standard American Beers have the lowest median scores by a fair length, I really wanted to split this category up by individual styles and beers to see if American Adjunct Lagers are pulling the category's ranking down.
+
+```{r lawnmower}
+beers %>%
+  filter(category == "Standard American Beer") %>%
+  mutate(beer_style = fct_reorder(beer_style, ss)) %>%
+  ggplot(aes(x = beer_style, y = ss)) +
+  geom_violin() +
+  geom_boxplot(width = 0.18) + 
+  stat_summary(fun.y = mean, shape = 5, geom = "point") +
+  geom_hline(yintercept = 0, lty = 2, col = "#898989") +
+  scale_y_continuous(breaks = seq(from = -9, to = 4, by = 1)) +
+  coord_flip() +
+  labs(x = "", y = "Standardized score")
+```
+
+**Figure 9.** Standardized score distributions by style for the five listed styles that I sorted into the "Standard American Beer" category.
+
+Well, it actually looks like people on BA dislike all of the American Standard Beers. So while the American adjunct lagers aren't derided on their own, my guess is that these styles are unfairly critiqued.
+
+```{r lm breweries}
+beers %>%
+  filter(category == "Standard American Beer") %>%
+  group_by(brewery_name) %>%
+  summarize(mean_bs = mean(ss),
+            se_bs = sd(ss) / n()) %>%
+  mutate(brewery_name = fct_reorder(brewery_name, mean_bs)) %>%
+  ggplot(aes(x = brewery_name, y = mean_bs,
+             ymin = mean_bs - se_bs,
+             ymax = mean_bs + se_bs)) +
+  geom_hline(yintercept = 0, lty = 1, col = "#bebebe") +
+  geom_linerange() +
+  geom_point(size = 0.1, shape = 21) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  labs(x = "Brewery", y = "Mean standardized score")
+```
+
+**Figure 10.** Out of all breweries producing a beer in the Standard American Beer category, the vast majority were consistently rated poorly. Each line represents one standard error about the mean for a given breweries; breweries were ordered from lowest to highest mean s.s. Brewery names were hidden from the x-axis because they overlapped too much.
+
+So, we see that all of the Standard American Beer styles tend to be unpopular, and furthermore, most breweries tend to be either consistently good or consistently bad. Now, let's look at specifically the top 10 best or worst Standard American Beers to see if we notice a trend there.
+
+**Table 3.** Top 10 beers in the Standard American Beer category. Not a single adjunct lager has made it here, and the highest standardized score is lower than 3 (also, note the gap between the highest and second highest scores).
+
+```{r SAB top10}
+beers %>%
+  filter(category == "Standard American Beer") %>%
+  ungroup(beer_style) %>%
+  mutate(score = round(score, 2),
+         ss = round(ss, 2)) %>%
+  top_n(10, ss) %>%
+  select("Score" = score,
+         "S.S." = ss,
+         "Beer" = beer_name,
+         "Style" = beer_style,
+         "Brewery" = brewery_name) %>%
+  arrange(desc(`S.S.`)) %>%
+  pander::pander()
+```
+
+**Table 4.** The lowest 10 beers in the Standard American Beer category by standardized score. Unsurprisingly, all of these are either adjunct lagers or light lagers are here.
+
+```{r SAB bottom10}
+beers %>%
+  filter(category == "Standard American Beer") %>%
+  ungroup(beer_style) %>%
+  mutate(score = round(score, 2),
+         ss = round(ss, 2)) %>%
+  top_n(-10, ss) %>%
+  select("Score" = score,
+         "S.S." = ss,
+         "Beer" = beer_name,
+         "Style" = beer_style,
+         "Brewery" = brewery_name) %>%
+  arrange(desc(`S.S.`)) %>%
+  pander::pander()
+```
+
+## Styles over time
+
+```{r time}
+reviews %>%
+  mutate(time = floor_date(review_time, unit = "years"),
+         category = as.factor(str_trunc(as.character(category),
+                              width = 15,
+                              side = "right"))) %>%
+  filter(year(time) >= 2000) %>%
+  group_by(time, category) %>%
+  summarize(r = mean(review_overall),
+            v = n()) %>%
+  mutate(score = (v / (v + 10)) * r + (10 / (v + 10)) * mean(r),
+         ss = (score - mean(score)) / sd(score)) %>%
+  ggplot(aes(x = time, y = ss)) +
+  geom_line() +
+  facet_wrap(~category, scales = "free_y") +
+  coord_cartesian(expand = FALSE) +
+  labs(x = "", y = "Aggregate S.S.") +
+  theme(strip.text = element_text(size = 8),
+        axis.text = element_text(size = 8),
+        axis.text.x = element_text(angle = 90, hjust = -1))
+```
+
+**Figure 11.** Aggregate category standardized score for each month between January 2000 and December 2011. Standard American beer is deceptively on the rise since 2011, but has never achieved an aggregate standardized score greater than -3.
+
+Some of the noticeable trends that are visible in these plots are as follows.
+1. Strong ales, as well as Trappist-style ales, have taken off since 2010. Either there were no reviews for these types of beers during this time period, or strong ales increase in popularity. Since Strong British ales remained on an upward trend, I am inclinded towards the former. However, strong Belgian ales notably have not made a recovery in ratings.
+2. Sours are on the rise, which is interesting, and they have continuously been on the rise for a number of years. I would be interested in seeing how this trend has continued through to today.
+3. The ubiquitous craft porter reached a popularity spike in 2011. Presumably this trend has continued growing, because now it is hard to find a craft brewery without their own porter.
+
+Of course, with more data (dating up to current times), these trends would probably be even more interesting.
+
+## Some brewery rankings
+
+As a wrap-up, I thought it might be fun to look at the distribution of scores for some breweries in WNC.
+
+```{r WNC breweries}
+beers %>% 
+  filter(brewery_name %in% breweries_list) %>%
+  mutate(brewery_name = fct_reorder(brewery_name, ss)) %>%
+  ggplot(aes(y = brewery_name, x = ss)) +
+  geom_boxplot() +
+  stat_summary(fun.y = mean, shape = 5) +
+  labs(y = "", x = "Standardized score")
+```
+
+**Figure 12.** Distribution of standardized beer scores for four breweries in WNC. Sierra Nevada is not exclusively in WNC, but does have one of three breweries there.
+
+There's not much else to say about this chart: these data end in 2011, so a lot of the newer breweries aren't present here, and there's no location field in the data so I didn't want to read through all of the breweries to find all of the WNC breweries that are included.
+
+# Conclusions
+
+So, I found that higher ABV beers are likely to be slightly more popular on BeerAdvocate, and I identified which styles were overall more popular. In particular, IPAs and DIPAs are popular on BeerAdvocate, but in general, strong beers, many Belgian styles, dark beers, and IPAs tend to be more popular than more "common" styles. 
+
+The Standard American Beer was particularly derided by BeerAdvocate, but instead of being weighed down by American adjunct lagers, I found that BeerAdvocate tends to give low scores to all styles within the Standard American beer category.
+
+Overall, I need to work on my webscraping skills so I can get data that goes up through 2020. Presumably, this would require a lot more computational power as the popularity of BeerAdvocate has grown, and thus accrued exponentially more reviews since 2011. However, I am definitely interesting in digging deeper into these trends, and supplementing these visualizations with more recent data if it can be obtained.
+
+# References
