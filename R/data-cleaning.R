@@ -1,10 +1,20 @@
-###
+################################################################################
 # Data Cleaning and Wrangling for BA data paper
-# @author Zane Billings
-# @date 2020-04-29
+# author: Zane Billings
+# date: 2020-04-29
+################################################################################
+
+################################################################################
+# Loading dependencies
+###
+library(dplyr, include.only = "%>%")
+
+################################################################################
+
+################################################################################
+# Cleaning large beer reviews data set
 ###
 
-library(dplyr, include.only = "%>%")
 # Read in raw data
 reviews <- arrow::read_parquet(
 	here::here("data/raw/beer_reviews.parquet"),
@@ -27,6 +37,7 @@ reviews <- reviews %>%
 	) %>%
 	dplyr::ungroup()
 
+# Recategorizing certain style listenings to match the IBA categories
 reviews$category <- forcats::fct_recode(
 	reviews$beer_style,
 	"German Wheat Beer" = "Hefeweizen",
@@ -135,13 +146,19 @@ reviews$category <- forcats::fct_recode(
 	"Belgian Ale" = "Bière de Champagne / Bière Brut"
 )
 
+# Write to file
 saveRDS(reviews, file = "cleaned/reviews.rds")
+################################################################################
 
+################################################################################
 # Second dataset contains average for all beers.
+###
+
 # Constant m determines how many reviews are necessary to avoid regularizing
 #  the score towards the mean too much.
 m <- 10
 
+# Calculate the regularized scores
 beers <- reviews %>%
 	dplyr::group_by(beer_name, beer_style, brewery_name, category) %>%
 	dplyr::summarize(
@@ -163,9 +180,14 @@ beers <- reviews %>%
 		ss = scale(score)
 	)
 
+# Write to file
 saveRDS(beers, file = "cleaned/beers.rds")
+################################################################################
 
+################################################################################
 # Also, deal with the data from the web scraper, just in case.
+###
+
 json_file <- here::here("beeradvocate-scraper","beers.json")
 df <-
 	jsonlite::fromJSON(
@@ -180,4 +202,9 @@ df <-
 		rAvg = as.numeric(rAvg)
 	)
 
+# Write to file
 saveRDS(df, "cleaned/scraped_data.rds")
+
+################################################################################
+# END OF FILE
+################################################################################
