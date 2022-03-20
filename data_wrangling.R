@@ -7,9 +7,10 @@
 library(tidyverse)
 library(jsonlite)
 # Read in raw data
-data_file <- here::here("socialmediadata-beeradvocate/data/beer_reviews.csv")
-reviews <- read_csv(data_file,
-                    col_types = "cfddddcfddcdc")
+reviews <- arrow::read_parquet(
+  here::here("data/raw/beer_reviews.parquet"),
+  col_types = "cfddddcfddcdc"
+)
 
 # First data set is all reviews.
 reviews <- reviews %>%
