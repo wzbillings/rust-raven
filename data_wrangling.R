@@ -4,8 +4,7 @@
 # @date 2020-04-29
 ###
 
-library(tidyverse)
-library(jsonlite)
+library(dplyr, include.only = "%>%")
 # Read in raw data
 reviews <- arrow::read_parquet(
   here::here("data/raw/beer_reviews.parquet"),
@@ -14,17 +13,17 @@ reviews <- arrow::read_parquet(
 
 # First data set is all reviews.
 reviews <- reviews %>%
-  select(-review_profilename) %>%
-  drop_na() %>%
-  mutate(review_time = lubridate::as_datetime(review_time),
+  dplyr::select(-review_profilename) %>%
+  tidyr::drop_na() %>%
+  dplyr::mutate(review_time = lubridate::as_datetime(review_time),
          review_date = lubridate::date(review_time),
          beer_name = as.factor(beer_name),
-         short_name = as.factor(str_trunc(
+         short_name = as.factor(stringr::str_trunc(
            as.character(beer_name),
            width = 20,side = "right"))) %>%
-  ungroup()
+  dplyr::ungroup()
 
-reviews$category <- fct_recode(reviews$beer_style,
+reviews$category <- forcats::fct_recode(reviews$beer_style,
                        "German Wheat Beer" = "Hefeweizen",
                        "Strong British Ale" = "English Strong Ale",
                        "Dark British Beer" = "Foreign / Export Stout",
@@ -135,8 +134,8 @@ saveRDS(reviews, file = "cleaned/reviews.rds")
 
 # Second dataset contains average for all beers.
 beers <- reviews %>%
-  group_by(beer_name, beer_style, brewery_name, category) %>%
-  summarize(rAvg = mean(review_overall),
+  dplyr::group_by(beer_name, beer_style, brewery_name, category) %>%
+  dplyr::summarize(rAvg = mean(review_overall),
             Avg_aroma = mean(review_aroma),
             Avg_appearance = mean(review_appearance),
             Avg_palate = mean(review_palate),
@@ -145,8 +144,8 @@ beers <- reviews %>%
             num_reviews = n(),
             rSD = sd(review_overall),
             rSE = rSD/num_reviews) %>%
-  filter(num_reviews > 2) %>%
-  ungroup()
+  dplyr::filter(num_reviews > 2) %>%
+  dplyr::ungroup()
 
 m <- 10
 c <- mean(beers$rAvg)
@@ -155,7 +154,7 @@ r <- beers$rAvg
 beers$score <- (v / (v + m)) * r + (m / (v + m)) * c
 beers$ss <- (beers$score - mean(beers$score)) / sd(beers$score)
 beers$short_name <- as.factor(
-  str_trunc(
+  stringr::str_trunc(
     as.character(beers$beer_name), 
     width = 20, 
     side = "right"))
@@ -164,9 +163,9 @@ saveRDS(beers, file = "cleaned/beers.rds")
 
 # Also, deal with the data from the web scraper, just in case.
 json_file <- here::here("beeradvocate-scraper","beers.json")
-df <- fromJSON(sprintf("[%s]", paste(readLines(json_file), collapse=",")))
+df <- jsonlite::fromJSON(sprintf("[%s]", paste(readLines(json_file), collapse=",")))
 df <- df %>%
-  mutate(
+  dplyr::mutate(
     timestamp = as.POSIXct(timestamp),
     num_reviews = as.numeric(timestamp),
     abv = as.numeric(abv),
