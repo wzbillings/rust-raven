@@ -10,8 +10,6 @@
 library(dplyr, include.only = "%>%")
 
 ################################################################################
-
-################################################################################
 # Cleaning large beer reviews data set
 ###
 
@@ -148,7 +146,6 @@ reviews$category <- forcats::fct_recode(
 
 # Write to file
 saveRDS(reviews, file = "cleaned/reviews.rds")
-################################################################################
 
 ################################################################################
 # Second dataset contains average for all beers.
@@ -182,7 +179,6 @@ beers <- reviews %>%
 
 # Write to file
 saveRDS(beers, file = "cleaned/beers.rds")
-################################################################################
 
 ################################################################################
 # Also, deal with the data from the web scraper, just in case.
