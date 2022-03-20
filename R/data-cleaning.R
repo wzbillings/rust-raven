@@ -19,11 +19,11 @@ reviews <- reviews %>%
 		review_time = lubridate::as_datetime(review_time),
 		review_date = lubridate::date(review_time),
 		beer_name = as.factor(beer_name),
-		short_name = as.factor(
-			stringr::str_trunc(
+		short_name = as.factor(stringr::str_trunc(
 				as.character(beer_name),
-				width = 20, side = "right")
-		)
+				width = 20,
+				side = "right"
+		))
 	) %>%
 	dplyr::ungroup()
 
@@ -138,6 +138,10 @@ reviews$category <- forcats::fct_recode(
 saveRDS(reviews, file = "cleaned/reviews.rds")
 
 # Second dataset contains average for all beers.
+# Constant m determines how many reviews are necessary to avoid regularizing
+#  the score towards the mean too much.
+m <- 10
+
 beers <- reviews %>%
 	dplyr::group_by(beer_name, beer_style, brewery_name, category) %>%
 	dplyr::summarize(
@@ -152,19 +156,12 @@ beers <- reviews %>%
 		rSE = rSD / num_reviews
 	) %>%
 	dplyr::filter(num_reviews > 2) %>%
-	dplyr::ungroup()
-
-m <- 10
-c <- mean(beers$rAvg)
-v <- beers$num_reviews
-r <- beers$rAvg
-beers$score <- (v / (v + m)) * r + (m / (v + m)) * c
-beers$ss <- (beers$score - mean(beers$score)) / sd(beers$score)
-beers$short_name <- as.factor(
-	stringr::str_trunc(
-		as.character(beers$beer_name), 
-		width = 20, 
-		side = "right"))
+	dplyr::ungroup() %>%
+	dplyr::mutate(
+		score = (num_reviews / (num_reviews + m)) * rAvg +
+			(m / (num_reviews + m)) * mean(rAvg),
+		ss = scale(score)
+	)
 
 saveRDS(beers, file = "cleaned/beers.rds")
 
