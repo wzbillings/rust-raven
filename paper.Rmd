@@ -13,23 +13,14 @@ nocite: "@*"
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
                       fig.asp = 0.618, fig.fullwidth = TRUE)
 
-library(jsonlite)
-library(here)
-library(tidyverse)
-library(lubridate)
-library(pander)
-library(cowplot)
-library(RColorBrewer)
-library(ggbeeswarm)
-
 zlib::write_renv_bib("BA_R.bib")
 
-old <- theme_set(theme_classic(base_size = 16))
-panderOptions('keep.trailing.zeros', TRUE)
-panderOptions('table.alignment.default', 'right')
-panderOptions('table.alignment.rownames', 'left')
-panderOptions('missing', "")
-panderOptions('table.split.table', Inf)
+old <- ggplot2::theme_set(ggplot2::theme_classic(base_size = 16))
+pander::panderOptions('keep.trailing.zeros', TRUE)
+pander::panderOptions('table.alignment.default', 'right')
+pander::panderOptions('table.alignment.rownames', 'left')
+pander::panderOptions('missing', "")
+pander::panderOptions('table.split.table', Inf)
 ```
 
 ```{r import data}
@@ -91,16 +82,16 @@ One of the most obvious questions to ask when looking at a dataset of beer revie
 *Table 1.* The top 10 beers in the dataset using the Bayesian review score as the metric.
 ```{r top10beerstable}
 beers %>%
-  ungroup(beer_style) %>%
-  mutate(score = round(score, 2),
+  dplyr::ungroup(beer_style) %>%
+  dplyr::mutate(score = round(score, 2),
          ss = round(ss, 2)) %>%
-  top_n(10, ss) %>%
-  select("Score" = score,
+  dplyr::top_n(10, ss) %>%
+  dplyr::select("Score" = score,
          "S.S." = ss,
          "Beer" = beer_name,
          "Style" = beer_style,
          "Brewery" = brewery_name) %>%
-  arrange(desc(`S.S.`)) %>%
+  dplyr::arrange(desc(`S.S.`)) %>%
   pander::pander()
 ```
 
@@ -112,23 +103,23 @@ Now, I also looked at the components which composed the ratings.
 
 ```{r top10beersplot}
 beers %>%
-  ungroup(beer_style) %>%
-  top_n(10, score) %>%
-  arrange(desc(ss)) %>%
-  select("overall" = rAvg,
+  dplyr::ungroup(beer_style) %>%
+  dplyr::top_n(10, score) %>%
+  dplyr::arrange(desc(ss)) %>%
+  dplyr::select("overall" = rAvg,
          "aroma" = Avg_aroma,
          "appearance" = Avg_appearance,
          "palate" = Avg_palate,
          "taste" = Avg_taste,
          "name" = short_name,
          "style" = beer_style) %>%
-  gather(key = "Area", value = "Score", -c(name, style)) %>%
-  mutate(Area = fct_rev(fct_relevel(Area, "aroma", "appearance", "palate", "taste", "overall"))) %>%
-  ggplot(aes(x = Score, y = Area, label = name)) +
-  geom_point() +
-  facet_wrap(~name, nrow = 2) +
-  scale_x_continuous(breaks = c(4, 4.5, 5), limits = c(4,5)) +
-  theme(strip.text = element_text(size = 8),
+  tidyr::gather(key = "Area", value = "Score", -c(name, style)) %>%
+  dplyr::mutate(Area = fct_rev(fct_relevel(Area, "aroma", "appearance", "palate", "taste", "overall"))) %>%
+  ggplot2::ggplot(ggplot2::aes(x = Score, y = Area, label = name)) +
+  ggplot2::geom_point() +
+  ggplot2::facet_wrap(~name, nrow = 2) +
+  ggplot2::scale_x_continuous(breaks = c(4, 4.5, 5), limits = c(4,5)) +
+  ggplot2::theme(strip.text = element_text(size = 8),
         axis.text.x = element_text(size = 8),
         legend.position = "none")
 ```
@@ -137,14 +128,14 @@ beers %>%
 
 ```{r top10abv}
 beers %>%
-  ungroup(beer_style) %>%
-  top_n(10, score) %>%
-  arrange(desc(ss)) %>%
-  select("S.S." = ss, ABV, "name" = short_name) %>%
-  ggplot(aes(x = ABV, y = `S.S.`, label = name)) +
-  geom_label(nudge_y = 0.005) +
-  geom_point() +
-  coord_cartesian(xlim = c(0, 15), ylim = c(3.38, 3.62), expand = FALSE)
+  dplyr::ungroup(beer_style) %>%
+  dplyr::top_n(10, score) %>%
+  dplyr::arrange(desc(ss)) %>%
+  dplyr::select("S.S." = ss, ABV, "name" = short_name) %>%
+  ggplot2::ggplot(ggplot2::aes(x = ABV, y = `S.S.`, label = name)) +
+  ggplot2::geom_label(nudge_y = 0.005) +
+  ggplot2::geom_point() +
+  ggplot2::coord_cartesian(xlim = c(0, 15), ylim = c(3.38, 3.62), expand = FALSE)
 ```
 
 **Figure 2.** Standardized score vs ABV for the top 10 beers by S.S. It looks like most (8/10) of the top 10 beers are higher ABV, though these are already the top 10 beers so modeling this trend doesn't make a lot of sense. 
@@ -156,9 +147,9 @@ Well, at least from these 10 beers, it looks like the secret to being a good bee
 Now I am interested in seeing if, in general, high ABV beers get better reviews on BeerAdvocate.
 
 ```{r ABV dist}
-ggplot(beers, aes(x = ABV)) +
-  geom_histogram(binwidth = 1, col = "black", fill = "white") +
-  geom_rug()
+ggplot2::ggplot(beers, ggplot2::aes(x = ABV)) +
+  ggplot2::geom_histogram(binwidth = 1, col = "black", fill = "white") +
+  ggplot2::geom_rug()
 ```
 
 **Figure 3.** Distribution of ABV values among all beers included in the dataset. While most beers fall between 5--10% ABV, some are much higher.
@@ -167,10 +158,10 @@ In North Carolina, there is a 15% legal limit on ABV for beer, so I decided to u
 
 ```{r ABV lt 15 dist}
 beers %>%
-  filter(ABV <= 15, ABV >= 1) %>%
-  ggplot(aes(x = ABV)) +
-  geom_histogram(binwidth = 1, col = "black", fill = "white") +
-  geom_rug()
+  dplyr::filter(ABV <= 15, ABV >= 1) %>%
+  ggplot2::ggplot(ggplot2::aes(x = ABV)) +
+  ggplot2::geom_histogram(binwidth = 1, col = "black", fill = "white") +
+  ggplot2::geom_rug()
 ```
 
 **Figure 4.** The distribution of ABV values for beers with ABV between 1--15% appears to be skewed right. The majority of beers tend to be around 5% ABV, but there are more higher gravity beers than lower gravity beers in the BeerAdvocate database.
@@ -179,11 +170,11 @@ Now that we are restricting our ABV values to a reasonable range, we can try to 
 
 ```{r ABV vs SS}
 beers %>%
-  filter(ABV <= 15, ABV >= 1) %>%
-  ggplot(aes(x = ABV, y = ss)) +
-  geom_point() +
-  coord_cartesian(xlim = c(0, 15.05), expand = FALSE) +
-  ylab("Standardized score")
+  dplyr::filter(ABV <= 15, ABV >= 1) %>%
+  ggplot2::ggplot(ggplot2::aes(x = ABV, y = ss)) +
+  ggplot2::geom_point() +
+  ggplot2::coord_cartesian(xlim = c(0, 15.05), expand = FALSE) +
+  ggplot2::ylab("Standardized score")
 ```
 
 **Figure 5.** Wow, those are some low scores. Maybe we need to get rid of outliers in the SS also.
