@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Are Donors Really Responding? Analyzing the Impact of Global Restrictions on NGOs
+# Beer Advocate Data Analysis
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -29,7 +29,7 @@ codename(seed = 714062, type = "ubuntu")
 **Text and figures:** All prose and images are licensed under Creative
 Commons ([CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)).
 
-**Code:** All code is licensed under the [GNU Affero GPL](LICENSE.md).
+**Code:** All code is licensed under the [GNU Affero GPL](LICENSE).
 
 ## Credit
 
