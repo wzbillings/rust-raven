@@ -22,7 +22,7 @@ library(cowplot)
 library(RColorBrewer)
 library(ggbeeswarm)
 
-papaja::r_refs("BA_R.bib")
+zlib::write_renv_bib("BA_R.bib")
 
 old <- theme_set(theme_classic(base_size = 16))
 panderOptions('keep.trailing.zeros', TRUE)

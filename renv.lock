@@ -59,6 +59,23 @@
       "Hash": "32e79b908fda56ee57fe518a8d37b864",
       "Requirements": []
     },
+    "arrow": {
+      "Package": "arrow",
+      "Version": "7.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "77fa403564ce3495510be855fb0c21d0",
+      "Requirements": [
+        "R6",
+        "assertthat",
+        "bit64",
+        "cpp11",
+        "purrr",
+        "rlang",
+        "tidyselect",
+        "vctrs"
+      ]
+    },
     "askpass": {
       "Package": "askpass",
       "Version": "1.1",
@@ -128,22 +145,6 @@
       "Requirements": [
         "rlang",
         "vctrs"
-      ]
-    },
-    "bookdown": {
-      "Package": "bookdown",
-      "Version": "0.25",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "6bbce515702d8d2f9a36b385bc629eb1",
-      "Requirements": [
-        "htmltools",
-        "jquerylib",
-        "knitr",
-        "rmarkdown",
-        "tinytex",
-        "xfun",
-        "yaml"
       ]
     },
     "broom": {
@@ -777,29 +778,6 @@
         "digest"
       ]
     },
-    "papaja": {
-      "Package": "papaja",
-      "Version": "0.1.0.9999",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "crsh",
-      "RemoteRepo": "papaja",
-      "RemoteRef": "master",
-      "RemoteSha": "f220612cc7b27b8685a3c70f1c0f5b9832bf9f5d",
-      "Hash": "d62d71c5c5c51f24a47b7447c319823b",
-      "Requirements": [
-        "bookdown",
-        "broom",
-        "glue",
-        "knitr",
-        "rmarkdown",
-        "rmdfiltr",
-        "tinylabels",
-        "yaml",
-        "zip"
-      ]
-    },
     "pillar": {
       "Package": "pillar",
       "Version": "1.7.0",
@@ -988,17 +966,6 @@
         "tinytex",
         "xfun",
         "yaml"
-      ]
-    },
-    "rmdfiltr": {
-      "Package": "rmdfiltr",
-      "Version": "0.1.3",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "d2e1277195d221e6118d8a77dda2e877",
-      "Requirements": [
-        "assertthat",
-        "rmarkdown"
       ]
     },
     "rprojroot": {
@@ -1191,14 +1158,6 @@
         "xml2"
       ]
     },
-    "tinylabels": {
-      "Package": "tinylabels",
-      "Version": "0.2.3",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "2cba68be303261e64987a11f6997fdfb",
-      "Requirements": []
-    },
     "tinytex": {
       "Package": "tinytex",
       "Version": "0.36",
@@ -1318,12 +1277,17 @@
       "Hash": "458bb38374d73bf83b1bb85e353da200",
       "Requirements": []
     },
-    "zip": {
-      "Package": "zip",
-      "Version": "2.2.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "c7eef2996ac270a18c2715c997a727c5",
+    "zlib": {
+      "Package": "zlib",
+      "Version": "0.0.1",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "wzbillings",
+      "RemoteRepo": "zlib",
+      "RemoteRef": "main",
+      "RemoteSha": "d6b9630168980195624c09bc6640cd3067296d64",
+      "Hash": "693d2d5ec9a88b59bc4dc852b79d952c",
       "Requirements": []
     }
   }
